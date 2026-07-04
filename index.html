@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>小川鮮魚 仕入帳</title>
+<title>仕入帳</title>
 <style>
   :root {
     --primary: #0077b6;
@@ -244,6 +244,60 @@
   .ac-item { padding: 13px 16px; font-size: 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
   .ac-item:last-child { border-bottom: none; }
   .ac-item:active, .ac-item:hover { background: #eff6ff; }
+  /* カスタムカレンダー */
+  .date-display-btn {
+    width: 100%; padding: 13px 14px;
+    border: 1.5px solid var(--border); border-radius: 10px;
+    font-size: 16px; color: var(--text); background: white;
+    cursor: pointer; text-align: left;
+    display: flex; align-items: center; gap: 8px;
+    -webkit-appearance: none;
+  }
+  .date-display-btn:focus { border-color: var(--primary); outline: none; }
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-nav { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-size: 20px; cursor: pointer; color: var(--text); }
+  #cal-title { font-size: 16px; font-weight: 800; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--sub); padding: 4px 0; }
+  .cal-day { text-align: center; padding: 9px 2px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.15s; }
+  .cal-day:active { transform: scale(0.88); }
+  .cal-day.other-month { color: var(--border); }
+  .cal-day.has-records { background: var(--primary-light); color: var(--primary); font-weight: 800; }
+  .cal-day.is-today { border: 2px solid var(--primary); font-weight: 700; }
+  .cal-day.selected { background: var(--primary) !important; color: white !important; font-weight: 800; }
+  .cal-legend { display: flex; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--sub); align-items: center; }
+  .cal-legend-dot { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+  /* 取扱説明書アコーディオン */
+  .man-sec {
+    border: 1.5px solid var(--border); border-radius: 10px;
+    margin-bottom: 8px; overflow: hidden; cursor: pointer;
+  }
+  .man-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px; font-size: 14px; font-weight: 700; color: var(--text);
+    background: #f8fafc;
+  }
+  .man-arr { font-size: 12px; color: var(--sub); transition: transform 0.2s; }
+  .man-sec.open .man-arr { transform: rotate(180deg); }
+  .man-body {
+    display: none; padding: 14px; background: white;
+    border-top: 1px solid var(--border);
+  }
+  .man-sec.open .man-body { display: block; }
+  .man-step {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-bottom: 10px; font-size: 13px; line-height: 1.6;
+  }
+  .man-step:last-of-type { margin-bottom: 0; }
+  .man-num {
+    min-width: 24px; height: 24px; background: var(--primary); color: white;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; flex-shrink: 0; margin-top: 1px;
+  }
+  .man-note {
+    background: #fffbeb; border: 1px solid var(--yellow); border-radius: 8px;
+    padding: 9px 12px; font-size: 12px; color: #92400e; margin-top: 10px; line-height: 1.5;
+  }
   /* 編集モーダル */
   .modal-overlay {
     display: none; position: fixed; inset: 0;
@@ -266,7 +320,7 @@
 <body>
 <header>
   <span class="logo">🐟</span>
-  <h1>小川鮮魚 仕入帳</h1>
+  <h1 id="shop-title">仕入帳</h1>
   <div class="hdate" id="hdate"></div>
 </header>
 
@@ -287,7 +341,10 @@
     <div class="card-title">⚡ 高速入力</div>
     <div class="form-group">
       <label>日付</label>
-      <input type="date" id="inp-date" onchange="renderTodayQuick()">
+      <button class="date-display-btn" onclick="openCal('inp-date')">
+        <span>📅</span><span id="inp-date-display">日付を選択</span>
+      </button>
+      <input type="hidden" id="inp-date">
     </div>
     <div class="form-group">
       <label>品名</label>
@@ -327,6 +384,10 @@
     <button class="btn-reg" onclick="addRecord()">＋ 登録する</button>
   </div>
 
+</div>
+
+<!-- ========== 確認タブ ========== -->
+<div class="tab" id="tab-check">
   <!-- 🚚 積み込み確認（入力日付と連動・丸ボタン・緑） -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -344,10 +405,10 @@
     <div id="today-list"></div>
   </div>
 
-  <!-- ✅ 仕入れ漏れ確認（日付自由選択・四角ボタン・オレンジ） -->
+  <!-- ✅ 仕入れ確認リスト（日付自由選択・四角ボタン・オレンジ） -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <div style="font-size:13px;font-weight:700;color:var(--sub);">✅ 仕入れ漏れ確認</div>
+      <div style="font-size:13px;font-weight:700;color:var(--sub);">📋 仕入れ確認リスト</div>
       <div style="display:flex;gap:6px">
         <button class="verify-all-btn" onclick="verifyAll()">全確認</button>
         <button class="load-reset-btn" onclick="resetVerify()">リセット</button>
@@ -355,7 +416,10 @@
     </div>
     <!-- 日付選択 -->
     <div class="verify-date-row">
-      <input type="date" id="verify-date" onchange="renderVerifySection()">
+      <button class="date-display-btn" onclick="openCal('verify-date')" style="flex:1;">
+        <span>📅</span><span id="verify-date-display">日付を選択</span>
+      </button>
+      <input type="hidden" id="verify-date">
       <div id="verify-status-badge"></div>
     </div>
     <div class="verify-progress">
@@ -385,6 +449,128 @@
 
 <!-- ========== 管理タブ ========== -->
 <div class="tab" id="tab-master">
+  <!-- 取扱説明書 -->
+  <div class="card">
+    <div class="card-title">📖 取扱説明書</div>
+    <p style="font-size:12px;color:var(--sub);margin-bottom:12px;">項目をタップすると説明が開きます</p>
+
+    <!-- 入力タブ -->
+    <div class="man-sec" onclick="toggleMan(this)">
+      <div class="man-head"><span>✏️ 仕入れを登録する</span><span class="man-arr">▼</span></div>
+      <div class="man-body">
+        <div class="man-step"><span class="man-num">①</span><div><b>日付</b>を選ぶ。カレンダーが開き、すでに仕入れのある日は<span style="background:var(--primary-light);color:var(--primary);border-radius:4px;padding:1px 6px;font-weight:700;">青く</span>表示されます。</div></div>
+        <div class="man-step"><span class="man-num">②</span><div><b>品名</b>を入力。登録済みの品名は自動で候補が出るのでタップ。</div></div>
+        <div class="man-step"><span class="man-num">③</span><div><b>問屋</b>を入力。同様に候補から選べます。</div></div>
+        <div class="man-step"><span class="man-num">④</span><div><b>数量</b>と<b>単価</b>を入力。合計金額が自動計算されます。</div></div>
+        <div class="man-step"><span class="man-num">⑤</span><div>「＋ 登録する」ボタンを押す。</div></div>
+        <div class="man-note">💡 同じ品名を再び入力すると前回の単価が自動提案されます。</div>
+      </div>
+    </div>
+
+    <!-- 積み込み確認 -->
+    <div class="man-sec" onclick="toggleMan(this)">
+      <div class="man-head"><span>🚚 積み込み確認の使い方</span><span class="man-arr">▼</span></div>
+      <div class="man-body">
+        <p style="font-size:13px;margin-bottom:10px;">入力タブで選んだ日付の仕入れリストが表示されます。トラックへの積み込み時にチェックします。</p>
+        <div class="man-step"><span class="man-num">●</span><div>各行の<span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:2px solid var(--success);background:var(--success);color:white;font-size:12px;vertical-align:middle;">✓</span>（丸ボタン）を押すとチェック済みになります。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div>「全チェック」ですべて一括でチェック。「リセット」でその日のチェックを全部外せます。</div></div>
+        <div class="man-note">📌 チェック状態は日付ごとに保存されます。</div>
+      </div>
+    </div>
+
+    <!-- 仕入れ確認リスト -->
+    <div class="man-sec" onclick="toggleMan(this)">
+      <div class="man-head"><span>📋 仕入れ確認リストの使い方</span><span class="man-arr">▼</span></div>
+      <div class="man-body">
+        <p style="font-size:13px;margin-bottom:10px;">問屋さんと仕入れ内容を照合するときに使います。日付は自由に選べます。</p>
+        <div class="man-step"><span class="man-num">①</span><div>カレンダーで確認したい日付を選ぶ。</div></div>
+        <div class="man-step"><span class="man-num">②</span><div>問屋ごとにグループ分けされた一覧が表示されます。</div></div>
+        <div class="man-step"><span class="man-num">③</span><div><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:2px solid var(--accent);background:var(--accent);color:white;font-size:12px;vertical-align:middle;">✓</span>（四角ボタン）を押して確認済みにしていく。</div></div>
+        <div class="man-step"><span class="man-num">④</span><div>全品目が確認済みになると「✅ すべて確認済み」と表示されます。</div></div>
+        <div class="man-note">📌 積み込み確認と仕入れ確認リストはそれぞれ独立しています。</div>
+      </div>
+    </div>
+
+    <!-- 一覧タブ -->
+    <div class="man-sec" onclick="toggleMan(this)">
+      <div class="man-head"><span>📋 一覧タブの使い方</span><span class="man-arr">▼</span></div>
+      <div class="man-body">
+        <div class="man-step"><span class="man-num">●</span><div>登録したすべての仕入れが日付の新しい順に表示されます。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div>上部の検索欄で品名や問屋名を絞り込めます。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div>各項目の<b>✏️ 編集</b>ボタンで数量・単価・日付などを後から修正できます。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div>🗑️ ボタンで削除。削除は取り消せないので注意。</div></div>
+      </div>
+    </div>
+
+    <!-- 集計タブ -->
+    <div class="man-sec" onclick="toggleMan(this)">
+      <div class="man-head"><span>📊 集計タブの使い方</span><span class="man-arr">▼</span></div>
+      <div class="man-body">
+        <div class="man-step"><span class="man-num">●</span><div>合計仕入金額と件数がひと目でわかります。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div>日別・品名別・問屋別の集計が確認できます。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div>日別カードをタップすると明細が展開されます。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div>「📥 全データをCSV出力」でExcel用のファイルをダウンロードできます（バックアップにも活用できます）。</div></div>
+      </div>
+    </div>
+
+    <!-- 売価計算タブ -->
+    <div class="man-sec" onclick="toggleMan(this)">
+      <div class="man-head"><span>💰 売価計算の使い方</span><span class="man-arr">▼</span></div>
+      <div class="man-body">
+        <div class="man-step"><span class="man-num">①</span><div>仕入れ記録から読み込むか、仕入れ金額を直接入力します。</div></div>
+        <div class="man-step"><span class="man-num">②</span><div>手数料・分割数・値入率を入力すると推奨売価が自動計算されます。</div></div>
+        <div class="man-step"><span class="man-num">③</span><div>値入率別の売価一覧表も表示されるので価格設定の参考になります。</div></div>
+        <div class="man-note">💡 手数料や値入率のデフォルト値は「管理 → ⚙️ 売価計算の初期設定」で保存できます。</div>
+      </div>
+    </div>
+
+    <!-- 管理タブ -->
+    <div class="man-sec" onclick="toggleMan(this)">
+      <div class="man-head"><span>⚙️ 管理タブの使い方</span><span class="man-arr">▼</span></div>
+      <div class="man-body">
+        <div class="man-step"><span class="man-num">●</span><div><b>🏪 店名設定</b>：店名を入力して保存するとアプリのタイトルとアイコンに反映されます。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div><b>📥 CSVエクスポート</b>：月を選んで特定の月だけ出力することもできます。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div><b>🐟 品名マスタ</b>：よく仕入れる品名を登録しておくと入力時に候補として出てきます。</div></div>
+        <div class="man-step"><span class="man-num">●</span><div><b>🏪 問屋マスタ</b>：問屋名も同様に登録できます。</div></div>
+      </div>
+    </div>
+
+    <!-- バックアップ -->
+    <div class="man-sec" onclick="toggleMan(this)">
+      <div class="man-head"><span>💾 バックアップの取り方</span><span class="man-arr">▼</span></div>
+      <div class="man-body">
+        <div class="man-step"><span class="man-num">①</span><div>「集計タブ」または「管理タブ」の <b>📥 全データをCSV出力</b> を押す。</div></div>
+        <div class="man-step"><span class="man-num">②</span><div>ダウンロードしたCSVファイルをiCloud Driveやメールなどでバックアップしておきます。</div></div>
+        <div class="man-step"><span class="man-num">③</span><div>万が一データが消えてもCSVファイルがあれば内容を確認できます。</div></div>
+        <div class="man-note">⚠️ データはこのiPhone（Safari）に保存されています。機種変更や「履歴とWebサイトデータを消去」を行うと消えますので定期的にCSV出力しておくことをおすすめします。</div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- 店名設定 -->
+  <div class="card">
+    <div class="card-title">🏪 店名設定</div>
+    <div class="form-group">
+      <label>店名</label>
+      <input type="text" id="shop-name-input" placeholder="例：小川鮮魚" inputmode="text">
+    </div>
+    <button onclick="saveShopName()" style="width:100%;padding:13px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">💾 店名を保存</button>
+  </div>
+
+  <!-- まるごとバックアップ -->
+  <div class="card">
+    <div class="card-title">🛟 まるごとバックアップ</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:10px;">仕入れデータ・店名・設定をすべて1つのファイルに保存します。月に1回の保存がおすすめです。万一データが消えても、このファイルがあれば元通りに戻せます。</div>
+    <button onclick="backupAll()" style="width:100%;padding:13px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">💾 バックアップを保存</button>
+    <label style="display:block;width:100%;margin-top:8px;padding:13px;background:#eff6ff;color:var(--primary);border:1.5px solid #bfdbfe;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;text-align:center">♻️ バックアップから復元
+      <input type="file" accept=".json,application/json" style="display:none" onchange="restoreAll(this)">
+    </label>
+  </div>
+
+  <div style="text-align:center;font-size:11px;color:var(--sub);margin:14px 0 4px">仕入帳 決定版 v2026.07.05</div>
+
   <div class="card">
     <div class="card-title">📥 CSVエクスポート（Excel用）</div>
     <div style="margin-bottom:12px">
@@ -437,6 +623,24 @@
     <div class="add-row">
       <input type="text" id="new-sup" placeholder="新しい問屋名">
       <button onclick="addSup()">追加</button>
+    </div>
+  </div>
+
+  <!-- 開発者情報 -->
+  <div class="card" style="background:linear-gradient(135deg,#0a2342,#1a5276);color:white;">
+    <div style="font-size:13px;font-weight:700;opacity:0.7;margin-bottom:12px;">ℹ️ このアプリについて</div>
+    <div style="font-size:22px;font-weight:900;margin-bottom:4px;">🐟 鮮魚仕入帳</div>
+    <div style="font-size:13px;opacity:0.8;margin-bottom:16px;">鮮魚業向け仕入れ管理アプリ</div>
+    <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:12px;">
+      <div style="font-size:11px;opacity:0.7;margin-bottom:4px;">開発者</div>
+      <div style="font-size:16px;font-weight:800;">㈱小川鮮魚</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.1);border-radius:10px;padding:12px;margin-top:8px;">
+      <div style="font-size:11px;opacity:0.7;margin-bottom:4px;">初回リリース</div>
+      <div style="font-size:16px;font-weight:800;">2026年5月</div>
+    </div>
+    <div style="font-size:11px;opacity:0.5;margin-top:12px;text-align:center;">
+      © 2026 ㈱小川鮮魚 All rights reserved.
     </div>
   </div>
 </div>
@@ -533,11 +737,34 @@
 <!-- ボトムナビ -->
 <nav>
   <button class="active" onclick="sw('input',this)"><span class="icon">✏️</span>入力</button>
-  <button onclick="sw('list',this)"><span class="icon">📋</span>一覧</button>
+  <button onclick="sw('check',this)"><span class="icon">📋</span>確認</button>
+  <button onclick="sw('list',this)"><span class="icon">📝</span>一覧</button>
   <button onclick="sw('sum',this)"><span class="icon">📊</span>集計</button>
   <button onclick="sw('price',this)"><span class="icon">💰</span>売価</button>
   <button onclick="sw('master',this)"><span class="icon">⚙️</span>管理</button>
 </nav>
+
+<!-- ========== カレンダーモーダル ========== -->
+<div class="modal-overlay" id="cal-modal" onclick="closeCalOutside(event)">
+  <div class="modal-sheet" style="padding-bottom:28px;">
+    <div class="modal-header">
+      <div class="modal-title">📅 日付を選択</div>
+      <button class="modal-close" onclick="closeCal()">×</button>
+    </div>
+    <div class="cal-header">
+      <button class="cal-nav" onclick="prevMonth()">‹</button>
+      <div id="cal-title"></div>
+      <button class="cal-nav" onclick="nextMonth()">›</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div class="cal-legend">
+      <div class="cal-legend-dot" style="background:var(--primary-light);border:1px solid var(--primary);"></div>
+      <span>仕入れあり</span>
+      <div class="cal-legend-dot" style="background:var(--primary);margin-left:10px;"></div>
+      <span>選択中</span>
+    </div>
+  </div>
+</div>
 
 <!-- ========== 編集モーダル ========== -->
 <div class="modal-overlay" id="edit-modal" onclick="closeEditOutside(event)">
@@ -580,16 +807,7 @@
 
 <script>
 // ===== 初期データ =====
-const INIT_RECORDS = [
-  {id:'i1',date:'2026-05-01',name:'アジ',    qty:1,  price:500,supplier:'中尾'},
-  {id:'i2',date:'2026-05-01',name:'サバ',    qty:2,  price:500,supplier:'大石'},
-  {id:'i3',date:'2026-05-01',name:'カンパチ',qty:1.5,price:500,supplier:'工藤'},
-  {id:'i4',date:'2026-05-01',name:'カツオ',  qty:3,  price:500,supplier:'ゲイコー'},
-  {id:'i5',date:'2026-05-01',name:'太刀魚',  qty:1,  price:500,supplier:'古閑'},
-  {id:'i6',date:'2026-05-01',name:'イカ',    qty:2,  price:500,supplier:'松屋'},
-  {id:'i7',date:'2026-05-01',name:'タコ',    qty:3,  price:500,supplier:'中尾'},
-  {id:'i8',date:'2026-05-01',name:'シジミ',  qty:5,  price:500,supplier:'大石'},
-];
+const INIT_RECORDS = [];
 const INIT_NAMES = ['アジ','サバ','カンパチ','カツオ','太刀魚','イカ','タコ','シジミ','マグロ','ブリ','タイ','ヒラメ','エビ','カニ'];
 const INIT_SUPS  = ['中尾','大石','工藤','ゲイコー','古閑','松屋'];
 const FE = {アジ:'🐟',サバ:'🐟',カンパチ:'🐠',カツオ:'🐟',太刀魚:'🐡',イカ:'🦑',タコ:'🐙',シジミ:'🦪',マグロ:'🐟',ブリ:'🐟',タイ:'🐡',ヒラメ:'🐟',エビ:'🦐',カニ:'🦀'};
@@ -782,25 +1000,39 @@ function renderVerifySection() {
     el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--sub);font-size:14px">この日の登録がありません</div>';
     return;
   }
-  // 未確認を先頭に
-  const sorted = [
-    ...rec.filter(r => !verified[r.id]),
-    ...rec.filter(r =>  verified[r.id])
-  ];
-  el.innerHTML = sorted.map(r => {
-    const done = !!verified[r.id];
+  // 問屋ごとにグループ化
+  const bySupplier = {};
+  rec.forEach(r => {
+    if (!bySupplier[r.supplier]) bySupplier[r.supplier] = [];
+    bySupplier[r.supplier].push(r);
+  });
+  el.innerHTML = Object.entries(bySupplier).map(([sup, items]) => {
+    const allDone = items.every(r => !!verified[r.id]);
+    const rows = [
+      ...items.filter(r => !verified[r.id]),
+      ...items.filter(r =>  verified[r.id])
+    ].map(r => {
+      const done = !!verified[r.id];
+      return `
+      <div class="today-list-item${done ? ' done' : ''}">
+        <button class="verify-btn${done ? ' done' : ''}" onclick="toggleVerify('${r.id}')">
+          ${done ? '✓' : ''}
+        </button>
+        <div class="fi">${fe(r.name)}</div>
+        <div class="tl-info">
+          <div class="tl-name">${r.name}</div>
+          <div class="tl-detail">${r.qty} × ¥${r.price.toLocaleString()}</div>
+        </div>
+        <div class="tl-price">¥${(r.qty*r.price).toLocaleString()}</div>
+        <button class="tl-edit" onclick="editRec('${r.id}')">✏️</button>
+      </div>`;
+    }).join('');
     return `
-    <div class="today-list-item${done ? ' done' : ''}">
-      <button class="verify-btn${done ? ' done' : ''}" onclick="toggleVerify('${r.id}')">
-        ${done ? '✓' : ''}
-      </button>
-      <div class="fi">${fe(r.name)}</div>
-      <div class="tl-info">
-        <div class="tl-name">${r.name}</div>
-        <div class="tl-detail">${r.qty} × ¥${r.price.toLocaleString()} ／ ${r.supplier}</div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:${allDone?'var(--success)':'var(--accent)'};padding:6px 2px;display:flex;align-items:center;gap:6px;border-bottom:2px solid ${allDone?'var(--success)':'var(--accent)'};margin-bottom:4px;">
+        🏪 ${sup} ${allDone?'<span style="font-size:11px;">✅ 確認済み</span>':''}
       </div>
-      <div class="tl-price">¥${(r.qty*r.price).toLocaleString()}</div>
-      <button class="tl-edit" onclick="editRec('${r.id}')">✏️</button>
+      ${rows}
     </div>`;
   }).join('');
 }
@@ -824,6 +1056,7 @@ function addRecord() {
   LS.saveRec(rec);
   refreshDL();
   renderTodayQuick();
+  renderVerifySection();
   showToast('✅ ' + name + ' ¥'+(qty*price).toLocaleString() + ' 登録！');
   document.getElementById('inp-name').value     = '';
   document.getElementById('inp-supplier').value = '';
@@ -1118,11 +1351,39 @@ function exportCSV(mode) {
 }
 
 // ===== タブ =====
+const SK_KEYS=['sk_rec','sk_names','sk_sups','sk_checked','sk_verified','sk_cfg','sk_shop'];
+function backupAll(){
+  const data={};
+  SK_KEYS.forEach(k=>{const v=localStorage.getItem(k); if(v!==null) data[k]=v;});
+  const blob=new Blob([JSON.stringify({app:'shiire',saved:new Date().toISOString(),data:data},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='仕入帳バックアップ_'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast('✅ バックアップを保存しました');
+}
+function restoreAll(input){
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const j=JSON.parse(r.result);
+      const d=j.data||j;
+      if(!d.sk_rec && !d.sk_shop && !d.sk_names){ alert('仕入帳のバックアップファイルではないようです'); input.value=''; return; }
+      if(!confirm('バックアップの内容で復元します。今のデータは上書きされます。よろしいですか？')){ input.value=''; return; }
+      Object.keys(d).forEach(k=>{ if(k.indexOf('sk_')===0 && typeof d[k]==='string') localStorage.setItem(k,d[k]); });
+      alert('✅ 復元しました。画面を再読み込みします。');
+      location.reload();
+    }catch(e){ alert('読み込みに失敗しました。ファイルをご確認ください。'); input.value=''; }
+  };
+  r.readAsText(f);
+}
 function sw(name, btn) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   btn.classList.add('active');
+  if(name==='check'){renderTodayQuick();renderVerifySection();}
   if(name==='list')   renderList();
   if(name==='sum')    renderSum();
   if(name==='master'){renderMaster();loadSettingsUI();updateExpMonths();}
@@ -1148,34 +1409,184 @@ function showToast(msg) {
 }
 
 // ===== PWAアイコン =====
-function setupPWAIcon() {
-  const S=512, canvas=document.createElement('canvas');
-  canvas.width=S; canvas.height=S;
-  const ctx=canvas.getContext('2d'), sc=S/180, r=36*sc;
+function setupPWAIcon(shopName) {
+  if (shopName === undefined) shopName = loadShopName();
+  const S = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = S; canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  const rad = S * 0.22;
   ctx.beginPath();
-  ctx.moveTo(r,0);ctx.lineTo(S-r,0);ctx.arcTo(S,0,S,r,r);ctx.lineTo(S,S-r);
-  ctx.arcTo(S,S,S-r,S,r);ctx.lineTo(r,S);ctx.arcTo(0,S,0,S-r,r);ctx.lineTo(0,r);ctx.arcTo(0,0,r,0,r);
-  ctx.closePath();ctx.save();ctx.clip();
-  const bg=ctx.createLinearGradient(0,0,0,S);bg.addColorStop(0,'#0096c7');bg.addColorStop(1,'#023e8a');
-  ctx.fillStyle=bg;ctx.fillRect(0,0,S,S);
-  ctx.save();ctx.translate(S*0.46,S*0.40);
-  ctx.beginPath();ctx.moveTo(50*sc,0);ctx.lineTo(82*sc,-30*sc);ctx.lineTo(88*sc,0);ctx.lineTo(82*sc,30*sc);ctx.closePath();ctx.fillStyle='rgba(255,255,255,0.90)';ctx.fill();
-  ctx.beginPath();ctx.ellipse(0,0,60*sc,30*sc,0,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.97)';ctx.fill();
-  ctx.beginPath();ctx.arc(-38*sc,-6*sc,9*sc,0,Math.PI*2);ctx.fillStyle='#023e8a';ctx.fill();
-  ctx.beginPath();ctx.arc(-41*sc,-9*sc,3.5*sc,0,Math.PI*2);ctx.fillStyle='white';ctx.fill();
+  ctx.moveTo(rad, 0); ctx.lineTo(S-rad, 0);
+  ctx.arcTo(S,0,S,rad,rad); ctx.lineTo(S,S-rad);
+  ctx.arcTo(S,S,S-rad,S,rad); ctx.lineTo(rad,S);
+  ctx.arcTo(0,S,0,S-rad,rad); ctx.lineTo(0,rad);
+  ctx.arcTo(0,0,rad,0,rad); ctx.closePath();
+  ctx.save(); ctx.clip();
+  const bg = ctx.createLinearGradient(0, 0, S, S);
+  bg.addColorStop(0, '#0a2342');
+  bg.addColorStop(0.5, '#1a5276');
+  bg.addColorStop(1, '#0e6655');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,S,S);
+  const glow = ctx.createRadialGradient(S*0.75, S*0.75, 0, S*0.75, S*0.75, S*0.5);
+  glow.addColorStop(0, 'rgba(22,160,133,0.35)');
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow; ctx.fillRect(0,0,S,S);
+  ctx.beginPath();
+  ctx.moveTo(0, S*0.78);
+  ctx.bezierCurveTo(S*0.25,S*0.68, S*0.55,S*0.85, S,S*0.72);
+  ctx.lineTo(S,S); ctx.lineTo(0,S); ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, S*0.88);
+  ctx.bezierCurveTo(S*0.30,S*0.80, S*0.65,S*0.94, S,S*0.84);
+  ctx.lineTo(S,S); ctx.lineTo(0,S); ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
+  ctx.save();
+  ctx.translate(S*0.48, S*0.42);
+  ctx.beginPath();
+  ctx.moveTo(S*0.18, 0);
+  ctx.lineTo(S*0.30, -S*0.10);
+  ctx.lineTo(S*0.32, 0);
+  ctx.lineTo(S*0.30, S*0.10);
+  ctx.closePath();
+  const tailGrad = ctx.createLinearGradient(S*0.18,0,S*0.32,0);
+  tailGrad.addColorStop(0,'rgba(255,255,255,0.6)');
+  tailGrad.addColorStop(1,'rgba(255,255,255,0.3)');
+  ctx.fillStyle = tailGrad; ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(0, 0, S*0.19, S*0.10, 0, 0, Math.PI*2);
+  const bodyGrad = ctx.createLinearGradient(-S*0.19,0,S*0.19,0);
+  bodyGrad.addColorStop(0,'rgba(255,255,255,0.95)');
+  bodyGrad.addColorStop(1,'rgba(200,230,255,0.90)');
+  ctx.fillStyle = bodyGrad; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-S*0.04, -S*0.09);
+  ctx.bezierCurveTo(S*0.04,-S*0.18, S*0.12,-S*0.18, S*0.14,-S*0.09);
+  ctx.closePath();
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.fill();
+  ctx.beginPath();
+  ctx.arc(-S*0.12, -S*0.02, S*0.025, 0, Math.PI*2);
+  ctx.fillStyle='#0a2342'; ctx.fill();
+  ctx.beginPath();
+  ctx.arc(-S*0.125, -S*0.03, S*0.009, 0, Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fill();
+  for(let i=0;i<3;i++){
+    ctx.beginPath();
+    ctx.arc(-S*0.02+i*S*0.055, S*0.01, S*0.028, Math.PI, 0);
+    ctx.strokeStyle='rgba(100,180,255,0.4)';
+    ctx.lineWidth=2;
+    ctx.stroke();
+  }
   ctx.restore();
-  ctx.textAlign='center';ctx.fillStyle='rgba(255,255,255,0.98)';
-  ctx.font=`900 ${26*sc}px "Hiragino Sans",sans-serif`;ctx.fillText('小川鮮魚',S*0.5,S*0.82);
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = 'white';
+  const displayName = shopName || '仕入帳';
+  const fontSize = displayName.length > 5 ? S*0.09 : S*0.115;
+  ctx.font = `800 ${fontSize}px "Hiragino Sans","Noto Sans JP",sans-serif`;
+  ctx.fillText(displayName, S*0.5, S*0.80);
+  if (shopName) {
+    ctx.shadowBlur = 0;
+    ctx.font = `500 ${S*0.065}px "Hiragino Sans","Noto Sans JP",sans-serif`;
+    ctx.fillStyle = 'rgba(150,220,210,0.9)';
+    ctx.fillText('仕 入 帳', S*0.5, S*0.91);
+  }
   ctx.restore();
-  const iconData=canvas.toDataURL('image/png');
-  let link=document.querySelector("link[rel='apple-touch-icon']");
-  if(!link){link=document.createElement('link');link.rel='apple-touch-icon';document.head.appendChild(link);}
-  link.href=iconData;
-  const manifest={name:'小川鮮魚 仕入帳',short_name:'小川鮮魚',start_url:'./',display:'standalone',background_color:'#023e8a',theme_color:'#0096c7',icons:[{src:iconData,sizes:'512x512',type:'image/png'}]};
-  const blob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
-  let mlink=document.querySelector("link[rel='manifest']");
-  if(!mlink){mlink=document.createElement('link');mlink.rel='manifest';document.head.appendChild(mlink);}
-  mlink.href=URL.createObjectURL(blob);
+  const iconData = canvas.toDataURL('image/png');
+  let link = document.querySelector("link[rel='apple-touch-icon']");
+  if (!link) { link=document.createElement('link'); link.rel='apple-touch-icon'; document.head.appendChild(link); }
+  link.href = iconData;
+  const appName = shopName ? shopName + ' 仕入帳' : '仕入帳';
+  const manifest = {
+    name: appName, short_name: shopName || '仕入帳',
+    start_url:'./', display:'standalone',
+    background_color:'#0a2342', theme_color:'#1a5276',
+    icons:[{src:iconData, sizes:'512x512', type:'image/png'}]
+  };
+  const blob = new Blob([JSON.stringify(manifest)],{type:'application/json'});
+  let mlink = document.querySelector("link[rel='manifest']");
+  if (!mlink) { mlink=document.createElement('link'); mlink.rel='manifest'; document.head.appendChild(mlink); }
+  mlink.href = URL.createObjectURL(blob);
+}
+
+// ===== カスタムカレンダー =====
+let calTarget = null, calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
+function openCal(targetId) {
+  calTarget = targetId;
+  const val = document.getElementById(targetId).value || today();
+  calYear = parseInt(val.split('-')[0]);
+  calMonth = parseInt(val.split('-')[1]) - 1;
+  renderCal();
+  document.getElementById('cal-modal').classList.add('show');
+}
+function closeCal() { document.getElementById('cal-modal').classList.remove('show'); }
+function closeCalOutside(e) { if (e.target===document.getElementById('cal-modal')) closeCal(); }
+function prevMonth() { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCal(); }
+function nextMonth() { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCal(); }
+function renderCal() {
+  const recordDates = new Set(LS.records().map(r=>r.date));
+  const selectedVal = document.getElementById(calTarget).value;
+  const todayStr = today();
+  const months=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  document.getElementById('cal-title').textContent = `${calYear}年 ${months[calMonth]}`;
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const lastDate = new Date(calYear, calMonth+1, 0).getDate();
+  const prevLastDate = new Date(calYear, calMonth, 0).getDate();
+  const dow = ['日','月','火','水','木','金','土'];
+  let html = dow.map((d,i)=>`<div class="cal-dow" style="${i===0?'color:var(--danger)':i===6?'color:var(--primary)':''}">${d}</div>`).join('');
+  for(let i=0;i<firstDay;i++){
+    const d=prevLastDate-firstDay+1+i;
+    const pm=calMonth===0?12:calMonth; const py=calMonth===0?calYear-1:calYear;
+    const ds=`${py}-${String(pm).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    html+=`<div class="cal-day other-month${recordDates.has(ds)?' has-records':''}${ds===selectedVal?' selected':''}" onclick="selectCalDate('${ds}')">${d}</div>`;
+  }
+  for(let d=1;d<=lastDate;d++){
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    let cls='cal-day';
+    if(recordDates.has(ds)) cls+=' has-records';
+    if(ds===selectedVal) cls+=' selected';
+    if(ds===todayStr) cls+=' is-today';
+    const isSun = new Date(calYear,calMonth,d).getDay()===0;
+    const isSat = new Date(calYear,calMonth,d).getDay()===6;
+    const color = ds===selectedVal?'' : isSun?'color:var(--danger);':isSat?'color:var(--primary);':'';
+    html+=`<div class="${cls}" style="${color}" onclick="selectCalDate('${ds}')">${d}</div>`;
+  }
+  const total=Math.ceil((firstDay+lastDate)/7)*7;
+  for(let d=1;d<=total-firstDay-lastDate;d++){
+    const nm=calMonth===11?1:calMonth+2; const ny=calMonth===11?calYear+1:calYear;
+    const ds=`${ny}-${String(nm).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    html+=`<div class="cal-day other-month${recordDates.has(ds)?' has-records':''}${ds===selectedVal?' selected':''}" onclick="selectCalDate('${ds}')">${d}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+function selectCalDate(dateStr) {
+  document.getElementById(calTarget).value = dateStr;
+  const disp = document.getElementById(calTarget+'-display');
+  if(disp) disp.textContent = fmtFull(dateStr);
+  closeCal();
+  if(calTarget==='inp-date') renderTodayQuick();
+  else if(calTarget==='verify-date') renderVerifySection();
+}
+
+// ===== 取扱説明書アコーディオン =====
+function toggleMan(el) { el.classList.toggle('open'); }
+
+// ===== 店名 =====
+function loadShopName() { return localStorage.getItem('sk_shop') || ''; }
+function saveShopName() {
+  const name = document.getElementById('shop-name-input').value.trim();
+  if (!name) { showToast('⚠️ 店名を入力してください'); return; }
+  localStorage.setItem('sk_shop', name);
+  applyShopName(name);
+  showToast('✅ 店名を保存しました');
+}
+function applyShopName(name) {
+  const title = name ? name + ' 仕入帳' : '仕入帳';
+  document.getElementById('shop-title').textContent = title;
+  document.title = title;
+  setupPWAIcon(name);
 }
 
 // ===== 初期化 =====
@@ -1183,16 +1594,29 @@ function init() {
   const t=today();
   document.getElementById('inp-date').value    = t;
   document.getElementById('verify-date').value = t;
+  document.getElementById('inp-date-display').textContent    = fmtFull(t);
+  document.getElementById('verify-date-display').textContent = fmtFull(t);
   document.getElementById('hdate').textContent = fmtFull(t);
   refreshDL();
   renderTodayQuick();
   renderVerifySection();
-  setupPWAIcon();
+  const shopName = loadShopName();
+  if (shopName) {
+    document.getElementById('shop-name-input').value = shopName;
+    applyShopName(shopName);
+  } else {
+    setupPWAIcon('');
+  }
 }
 init();
 </script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="小川鮮魚">
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script>
 </body>
 </html>
